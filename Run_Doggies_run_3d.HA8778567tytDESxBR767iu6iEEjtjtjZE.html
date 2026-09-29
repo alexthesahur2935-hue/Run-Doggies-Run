@@ -342,15 +342,176 @@ function renderSkinButtons(){
   });
 }
 
+function clearGroup(g){while(g.children.length)g.remove(g.children[0]);}
+function addPart(g,geo,material,x=0,y=0,z=0,rx=0,ry=0,rz=0,sx=1,sy=1,sz=1){
+  const m=new THREE.Mesh(geo,material);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.scale.set(sx,sy,sz);m.castShadow=true;g.add(m);return m;
+}
+function boxPart(g,c,x,y,z,w,h,d,rx=0,ry=0,rz=0){return addPart(g,new THREE.BoxGeometry(w,h,d),mat(c),x,y,z,rx,ry,rz);}
+function spherePart(g,c,x,y,z,r,sy=1){return addPart(g,new THREE.SphereGeometry(r,16,10),mat(c),x,y,z,0,0,0,1,sy,1);}
+function conePart(g,c,x,y,z,r,h,rot=0){return addPart(g,new THREE.ConeGeometry(r,h,8),mat(c),x,y,z,0,0,rot);}
+function cylPart(g,c,x,y,z,r,h,rotX=0,rotY=0,rotZ=0){return addPart(g,new THREE.CylinderGeometry(r,r,h,12),mat(c),x,y,z,rotX,rotY,rotZ);}
+function humanAvatar(g,skinName){
+  const [shirt,pants,skinC,accent]=skins[skinName]||skins.Traveler; clearGroup(g);
+  boxPart(g,pants,-.22,.52,0,.34,.78,.38); boxPart(g,pants,.22,.52,0,.34,.78,.38);
+  boxPart(g,0x20242b,-.22,.08,-.07,.42,.18,.55); boxPart(g,0x20242b,.22,.08,-.07,.42,.18,.55);
+  boxPart(g,shirt,0,1.35,0,.92,1.05,.46); boxPart(g,shirt,-.58,1.35,0,.22,.9,.34); boxPart(g,shirt,.58,1.35,0,.22,.9,.34);
+  boxPart(g,skinC,-.58,.88,0,.2,.34,.34); boxPart(g,skinC,.58,.88,0,.2,.34,.34);
+  boxPart(g,skinC,0,1.98,0,.22,.2,.22); boxPart(g,skinC,0,2.38,0,.66,.66,.62);
+  boxPart(g,accent,0,2.72,0,.70,.20,.66);
+  for(const x of [-.13,.13]){boxPart(g,0xf7f7f7,x,2.43,.325,.10,.12,.035);boxPart(g,0x111111,x,2.43,.347,.035,.06,.018);}
+  boxPart(g,0x8b4b3a,0,2.25,.33,.22,.035,.035);
+  if(["Punk"].includes(skinName))for(let i=-2;i<=2;i++)conePart(g,accent,i*.13,2.91,0,.08,.28);
+  else if(["Alex (Eaglercraft 1.5.2)","Traveler","Farmer","Chef","Soccer Player","Astronaut","Tourist","Musician"].includes(skinName)){boxPart(g,accent,-.36,2.55,0,.14,.42,.66);boxPart(g,accent,.36,2.55,0,.14,.42,.66);}
+  else boxPart(g,accent,0,2.80,0,.72,.16,.66);
+  if(skinName==="Chef")boxPart(g,0xffffff,0,2.92,0,.72,.28,.68);
+  if(skinName==="Astronaut")boxPart(g,0x8fb3c9,0,2.86,0,.78,.12,.70);
+  if(skinName==="Detective")boxPart(g,0x2d2d2d,0,2.84,0,.82,.13,.68);
+  if(skinName==="Tourist")boxPart(g,0xe5b84a,0,2.86,0,.84,.14,.70);
+}
+
+function pokemonAvatar(g,name){
+  clearGroup(g);
+  const C={
+    Pikachu:[0xf5d32f,0x8b1d24],Charizard:[0xe85b3a,0xf1a33a],Bulbasaur:[0x78a84b,0x8b5a9d],Squirtle:[0x65b7c6,0x9b6b43],
+    Gengar:[0x66508f,0xe6e0ff],Lucario:[0x4d78a8,0x2e405c],Greninja:[0x3d6f9d,0x273f63],Snorlax:[0x4f6e9d,0x33445d],
+    Baxcalibur:[0x5b6678,0x91a5b8],Mewtwo:[0xa9a2c8,0x6e5f9a]
+  }[name];
+  const body=C[0], accent=C[1], white=0xf5f5f5, black=0x171717;
+  // Rounded creature body, stubby limbs, oversized head: deliberately non-human silhouettes.
+  if(name==="Pikachu"){
+    spherePart(g,body,0,1.15,0,.72,1.15); spherePart(g,body,0,2.25,0,.62,1.05);
+    spherePart(g,0x171717,-.18,2.36,.54,.075); spherePart(g,0x171717,.18,2.36,.54,.075);
+    spherePart(g,0xe85b3a,-.36,2.17,.50,.10);spherePart(g,0xe85b3a,.36,2.17,.50,.10);
+    conePart(g,body,-.30,2.92,0,.16,.75);conePart(g,body,.30,2.92,0,.16,.75);
+    conePart(g,accent,-.30,3.18,0,.12,.28);conePart(g,accent,.30,3.18,0,.12,.28);
+    boxPart(g,body,.62,1.35,.02,.16,1.15,.16,0,0,-.65);boxPart(g,accent,.75,1.80,.02,.16,.42,.16,0,0,-.65);
+    spherePart(g,0x20242b,-.38,.48,0,.22);spherePart(g,0x20242b,.38,.48,0,.22);
+  } else if(name==="Charizard"){
+    spherePart(g,body,0,1.2,0,.75,1.25);spherePart(g,body,0,2.25,0,.55,1.05);spherePart(g,accent,-.22,2.38,.47,.07);spherePart(g,accent,.22,2.38,.47,.07);
+    conePart(g,body,-.28,2.95,0,.16,.65);conePart(g,body,.28,2.95,0,.16,.65);
+    // wings
+    boxPart(g,body,-.78,1.85,-.02,.12,1.25,.72,0,.35,0);boxPart(g,body,.78,1.85,-.02,.12,1.25,.72,0,-.35,0);
+    cylPart(g,accent,.62,.72,-.05,.08,.55,0,0,-.7);spherePart(g,accent,.72,1.02,-.05,.13);
+  } else if(name==="Bulbasaur"){
+    spherePart(g,body,0,1.05,0,.78,1.0);spherePart(g,body,0,2.0,.02,.60,1.0);
+    spherePart(g,0x3d5f36,-.22,2.10,.52,.07);spherePart(g,0x3d5f36,.22,2.10,.52,.07);
+    const bulb=spherePart(g,accent,0,2.78,-.03,.46,1.1);for(let i=0;i<4;i++)conePart(g,0x5b7e42,(i-1.5)*.16,3.05,-.03,.09,.35,i*.7);
+    for(const x of [-.46,.46])spherePart(g,body,x,.48,0,.22);
+  } else if(name==="Squirtle"){
+    spherePart(g,body,0,1.18,0,.72,1.05);spherePart(g,body,0,2.20,.02,.54,1.0);
+    spherePart(g,0x111111,-.18,2.28,.50,.06);spherePart(g,0x111111,.18,2.28,.50,.06);
+    // shell
+    spherePart(g,accent,0,1.30,-.48,.66,.95);boxPart(g,0xd8b879,0,1.30,-.86,.12,1.0,.08);
+    for(const x of [-.46,.46])spherePart(g,body,x,.55,0,.20);
+  } else if(name==="Gengar"){
+    spherePart(g,body,0,1.35,0,.85,1.05);spherePart(g,body,0,2.25,.02,.62,1.0);
+    conePart(g,body,-.34,2.96,0,.18,.70);conePart(g,body,.34,2.96,0,.18,.70);
+    spherePart(g,white,-.20,2.30,.56,.11);spherePart(g,white,.20,2.30,.56,.11);
+    spherePart(g,0x111111,-.20,2.30,.64,.045);spherePart(g,0x111111,.20,2.30,.64,.045);
+    for(const x of [-.55,.55])spherePart(g,body,x,.70,0,.22);
+  } else if(name==="Lucario"){
+    spherePart(g,body,0,1.20,0,.62,1.3);spherePart(g,body,0,2.25,0,.48,1.05);
+    conePart(g,body,-.28,2.98,0,.13,.75);conePart(g,body,.28,2.98,0,.13,.75);
+    boxPart(g,0x20242b,-.18,2.32,.43,.10,.16,.05);boxPart(g,0x20242b,.18,2.32,.43,.10,.16,.05);
+    conePart(g,accent,0,2.72,.46,.10,.30);for(const x of [-.52,.52])spherePart(g,body,x,.65,0,.18);
+  } else if(name==="Greninja"){
+    spherePart(g,body,0,1.25,0,.62,1.4);spherePart(g,body,0,2.30,0,.48,1.0);
+    conePart(g,body,-.25,2.98,0,.13,.65);conePart(g,body,.25,2.98,0,.13,.65);
+    boxPart(g,0xf0e0e0,0,2.05,.48,.80,.16,.12);spherePart(g,black,-.18,2.30,.53,.055);spherePart(g,black,.18,2.30,.53,.055);
+    // long tongue scarf
+    addPart(g,new THREE.CylinderGeometry(.055,.075,1.35,10),mat(0xe45c8a),0,1.95,.55,Math.PI/2,0,.12);
+    for(const x of [-.42,.42])spherePart(g,body,x,.62,0,.18);
+  } else if(name==="Snorlax"){
+    spherePart(g,body,0,1.25,0,.95,1.2);spherePart(g,body,0,2.20,0,.70,1.0);
+    boxPart(g,0xdce5e9,-.24,2.26,.63,.16,.16,.05);boxPart(g,0xdce5e9,.24,2.26,.63,.16,.16,.05);
+    for(const x of [-.72,.72])spherePart(g,body,x,.72,0,.28);for(const x of [-.34,.34])spherePart(g,body,x,.35,0,.30);
+    conePart(g,0x20242b,-.36,2.83,0,.10,.25);conePart(g,0x20242b,.36,2.83,0,.10,.25);
+  } else if(name==="Baxcalibur"){
+    spherePart(g,body,0,1.25,0,.72,1.35);spherePart(g,body,0,2.28,0,.58,1.05);
+    // dorsal blade
+    boxPart(g,accent,0,2.95,-.05,.20,.95,.18,0,0,.15);boxPart(g,accent,0,1.75,-.48,.26,1.35,.16,Math.PI/2,0,0);
+    conePart(g,body,-.30,3.05,0,.14,.55);conePart(g,body,.30,3.05,0,.14,.55);
+    for(const x of [-.5,.5])spherePart(g,body,x,.60,0,.20);
+  } else if(name==="Mewtwo"){
+    spherePart(g,body,0,1.35,0,.58,1.5);spherePart(g,body,0,2.30,0,.52,1.0);
+    conePart(g,accent,-.28,2.98,0,.12,.65);conePart(g,accent,.28,2.98,0,.12,.65);
+    spherePart(g,white,-.18,2.34,.48,.06);spherePart(g,white,.18,2.34,.48,.06);
+    // long tail
+    addPart(g,new THREE.CylinderGeometry(.07,.12,1.6,10),mat(accent),.0,1.25,-.65,Math.PI/2,0,0.25);
+    for(const x of [-.45,.45])spherePart(g,body,x,.55,0,.18);
+  }
+}
+
+function brainrotAvatar(g,name){
+  clearGroup(g);
+  const brown=0x70452c, wood=0x9a6238, green=0x4c8a55, dark=0x263b2b, blue=0x4c78c9, cream=0xf0dfc1, coffee=0x7a4b2d, pink=0xf0a9b9;
+  if(name==="Tralalero Tralala"){
+    // Shark with three legs and blue sneakers.
+    spherePart(g,blue,0,1.65,0,.78,1.0); spherePart(g,blue,0,2.38,.08,.62,1.0);
+    conePart(g,0x8ec8d8,0,2.36,.60,.22,.55,Math.PI/2); // snout
+    for(const x of [-.18,.18]){spherePart(g,0xffffff,x,2.48,.55,.09);spherePart(g,0x111111,x,2.48,.62,.04);}
+    for(const x of [-.42,0,.42]){boxPart(g,blue,x,.65,0,.25,1.15,.25);boxPart(g,0x2d4f91,x,.08,-.04,.38,.16,.60);}
+    conePart(g,blue,0,2.95,-.05,.12,.35);boxPart(g,0x8ec8d8,0,1.70,-.72,.75,.35,.18);
+  } else if(name==="Tung Tung Tung Sahur"){
+    // Wooden drum-like humanoid, without the weapon prop.
+    cylPart(g,wood,0,1.45,0,.48,1.55,Math.PI/2);cylPart(g,wood,0,2.48,0,.38,.72,Math.PI/2);
+    boxPart(g,0x3f2417,-.50,1.35,0,.16,.85,.16,0,0,-.15);boxPart(g,0x3f2417,.50,1.35,0,.16,.85,.16,0,0,.15);
+    spherePart(g,0x111111,-.14,2.55,.38,.055);spherePart(g,0x111111,.14,2.55,.38,.055);
+    for(const x of [-.25,.25])boxPart(g,wood,x,.35,0,.28,.65,.28);
+  } else if(name==="Brr Brr Patapim"){
+    // Proboscis monkey with oversized human-like feet.
+    spherePart(g,green,0,1.25,0,.78,1.15);spherePart(g,green,0,2.25,.05,.55,1.0);
+    spherePart(g,0x9d7a5a,0,2.08,.52,.25,1.4);spherePart(g,0x171717,-.17,2.35,.50,.06);spherePart(g,0x171717,.17,2.35,.50,.06);
+    for(const x of [-.46,.46]){spherePart(g,green,x,.50,0,.20);spherePart(g,0xc5a27c,x,.12,-.10,.30,.55);}
+  } else if(name==="Lirili Larila"){
+    // Elephant/cactus hybrid in sandals.
+    spherePart(g,green,0,1.25,0,.78,1.15);spherePart(g,green,0,2.28,.05,.58,1.0);
+    addPart(g,new THREE.CylinderGeometry(.13,.20,.85,10),mat(green),0,2.35,.52,Math.PI/2,0,0);
+    for(const x of [-.34,.34])conePart(g,green,x,2.92,0,.13,.50);
+    for(const x of [-.48,.48]){boxPart(g,green,x,.50,0,.28,.80,.28);boxPart(g,0xd8b36a,x,.10,-.05,.45,.14,.60);}
+  } else if(name==="Bombardiro Crocodilo"){
+    // Crocodile head fused to a small bomber aircraft silhouette.
+    boxPart(g,0x4b7f52,0,1.55,0,1.15,.62,1.65);spherePart(g,0x4b7f52,0,2.15,.38,.58,.85);
+    boxPart(g,0x39483e,0,1.45,-.72,1.35,.20,.75);boxPart(g,0x667a5a,-.95,1.48,0,.95,.12,.42,0,.25,0);boxPart(g,0x667a5a,.95,1.48,0,.95,.12,.42,0,-.25,0);
+    for(const x of [-.20,.20]){spherePart(g,0xffffff,x,2.24,.85,.09);spherePart(g,0x111111,x,2.24,.93,.04);}
+    boxPart(g,0x9a9a9a,0,2.05,.85,.58,.16,.30);
+  } else if(name==="Cappuccino Assassino"){
+    // Coffee-cup body with ninja styling, but no weapon.
+    cylPart(g,coffee,0,1.35,0,.65,1.35);cylPart(g,0xe9d7b8,0,2.10,0,.68,.16);spherePart(g,coffee,0,2.35,0,.46,.65);
+    boxPart(g,0x111111,-.18,2.38,.42,.12,.06,.03);boxPart(g,0x111111,.18,2.38,.42,.12,.06,.03);
+    boxPart(g,0x111111,-.62,1.25,0,.18,.75,.18,0,0,-.35);boxPart(g,0x111111,.62,1.25,0,.18,.75,.18,0,0,.35);
+  } else if(name==="Chimpanzini Bananini"){
+    // Monkey/banana hybrid.
+    spherePart(g,0x6f4a2d,0,1.30,0,.75,1.15);spherePart(g,0xe5c13a,0,2.20,.02,.58,1.0);
+    spherePart(g,0x171717,-.17,2.28,.52,.06);spherePart(g,0x171717,.17,2.28,.52,.06);
+    addPart(g,new THREE.CapsuleGeometry(.11,.95,5,10),mat(0xe5c13a),.58,1.35,0,0,0,-.55);
+    for(const x of [-.48,.48])spherePart(g,0x6f4a2d,x,.55,0,.22);
+  } else if(name==="Frigo Camelo"){
+    // Camel body fused with a refrigerator front.
+    boxPart(g,0x91c8d8,0,1.45,0,1.15,1.25,.85);boxPart(g,0xf0f0f0,0,1.65,.45,.85,.85,.06);
+    spherePart(g,0xb78f6a,0,2.40,0,.52,1.0);for(const x of [-.28,.28])conePart(g,0xb78f6a,x,2.92,0,.12,.45);
+    for(const x of [-.48,.48])boxPart(g,0xb78f6a,x,.55,0,.25,.95,.25);boxPart(g,0x111111,.35,1.85,.50,.05,.25,.05);
+  } else if(name==="Ballerina Cappuccina"){
+    // Ballerina with a cappuccino-cup head and tutu.
+    cylPart(g,coffee,0,2.25,0,.50,.75);cylPart(g,0xe9d7b8,0,2.68,0,.54,.12);spherePart(g,pink,0,1.35,0,.62,1.1);
+    conePart(g,0xf4c4d5,0,1.55,0,.90,.55);for(const x of [-.30,.30])boxPart(g,pink,x,.52,0,.18,.90,.18);boxPart(g,0xf0f0f0,-.35,.10,-.05,.42,.12,.60);boxPart(g,0xf0f0f0,.35,.10,-.05,.42,.12,.60);
+    boxPart(g,0x111111,-.18,2.30,.44,.10,.05,.03);boxPart(g,0x111111,.18,2.30,.44,.10,.05,.03);
+  } else if(name==="La Vaca Saturno Saturnita"){
+    // Cow body with Saturn-like ring.
+    spherePart(g,cream,0,1.35,0,.80,1.1);spherePart(g,cream,0,2.25,.03,.56,1.0);
+    spherePart(g,0x6f5b4b,-.28,2.30,.48,.10);spherePart(g,0x6f5b4b,.28,2.30,.48,.10);
+    for(const x of [-.46,.46])spherePart(g,cream,x,.52,0,.22);
+    addPart(g,new THREE.TorusGeometry(1.05,.07,10,32),mat(0x7b5cc7),0,1.35,0,Math.PI/2,0,0);
+    spherePart(g,0x7b5cc7,0,1.35,0,.24);
+  }
+}
+
 function buildCharacterInto(group,skinName=skin){
-  while(group.children.length)group.remove(group.children[0]);
-  const [shirt,pants,skinC,hatC]=skins[skinName]||skins.Traveler;
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.62,1.1,5,10),mat(shirt));body.position.y=1.55;body.castShadow=true;
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.36,16,12),mat(skinC));head.position.y=2.45;head.castShadow=true;
-  const hat=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.2,16),mat(hatC));hat.position.y=2.82;hat.castShadow=true;
-  const legs=new THREE.Mesh(new THREE.BoxGeometry(.78,.65,.46),mat(pants));legs.position.y=.72;legs.castShadow=true;
-  group.add(body,head,hat,legs);
-  return group;
+  const pokemonNames=["Pikachu","Charizard","Bulbasaur","Squirtle","Gengar","Lucario","Greninja","Snorlax","Baxcalibur","Mewtwo"];
+  const brainrotNames=["Tralalero Tralala","Tung Tung Tung Sahur","Brr Brr Patapim","Lirili Larila","Bombardiro Crocodilo","Cappuccino Assassino","Chimpanzini Bananini","Frigo Camelo","Ballerina Cappuccina","La Vaca Saturno Saturnita"];
+  if(pokemonNames.includes(skinName)) pokemonAvatar(group,skinName);
+  else if(brainrotNames.includes(skinName)) brainrotAvatar(group,skinName);
+  else humanAvatar(group,skinName);
 }
 
 function buildCharacter(){
@@ -451,7 +612,7 @@ function applyWorld(w){
   coins=Number(w.coins)||0; meals=Array.isArray(w.meals)?w.meals.map(Number).filter(Number.isFinite):[];
   dishesMade=Number(w.dishesMade)||0; dishesSold=Number(w.dishesSold)||0;
   for(const k of Object.keys(inventory))inventory[k]=Number(w.inventory?.[k])||0;
-  currentMeal={ketchup:Number(w.currentMeal?.ketchup)||0,mustard:Number(w.currentMeal?.mustard)||0,salt:Number(w.currentMeal?.salt)||0,pepper:Number(w.currentMeal?.pepper)||0};
+  currentMeal=normalizeMealCondiment({ketchup:Number(w.currentMeal?.ketchup)||0,mustard:Number(w.currentMeal?.mustard)||0,salt:Number(w.currentMeal?.salt)||0,pepper:Number(w.currentMeal?.pepper)||0});
   if(w.skin&&skins[w.skin]){skin=w.skin;buildCharacter()}
   if(w.username){username=String(w.username).slice(0,20);localStorage.setItem("runDoggiesRunUsername",username)}
   const usernameEl=document.getElementById("username"); if(usernameEl)usernameEl.value=username;
@@ -546,6 +707,15 @@ function collectDog(){
 function ingredientBonus(meal){
   return Object.entries(meal).reduce((sum,[item,count])=>sum+prices[item]*count,0);
 }
+function selectedCondiment(meal=currentMeal){
+  return Object.keys(prices).find(item=>(Number(meal[item])||0)>0)||null;
+}
+function normalizeMealCondiment(meal){
+  const cleaned={ketchup:0,mustard:0,salt:0,pepper:0};
+  const chosen=selectedCondiment(meal);
+  if(chosen)cleaned[chosen]=1;
+  return cleaned;
+}
 function renderShop(){
   const el=document.getElementById("shopItems"); el.innerHTML="";
   for(const item of Object.keys(prices)){
@@ -560,14 +730,26 @@ function renderShop(){
 function openShop(){ renderShop(); document.getElementById("shopMenu").classList.remove("hidden"); document.exitPointerLock?.(); }
 function renderKitchen(){
   const el=document.getElementById("kitchenItems"); el.innerHTML="";
+  const chosen=selectedCondiment();
   for(const item of Object.keys(prices)){
     const row=document.createElement("div"); row.className="row";
-    row.innerHTML=`<span>${ingredientLabels[item]} — owned: ${inventory[item]}, in meal: ${currentMeal[item]}</span>`;
-    const b=document.createElement("button"); b.textContent="Add"; b.disabled=inventory[item]<=0; b.onclick=()=>{inventory[item]--;currentMeal[item]++;renderKitchen();};
+    const isChosen=chosen===item;
+    row.innerHTML=`<span>${ingredientLabels[item]} — owned: ${inventory[item]}${isChosen?" — ADDED":""}</span>`;
+    const b=document.createElement("button");
+    b.textContent=isChosen?"Added":"Add";
+    b.disabled=inventory[item]<=0||chosen!==null;
+    b.onclick=()=>{
+      if(selectedCondiment()!==null||inventory[item]<=0)return;
+      inventory[item]--;
+      currentMeal={ketchup:0,mustard:0,salt:0,pepper:0};
+      currentMeal[item]=1;
+      renderKitchen();
+    };
     row.appendChild(b); el.appendChild(row);
   }
   const bonus=ingredientBonus(currentMeal);
-  document.getElementById("mealInfo").textContent=`Current dog dish: 15 base coins + ${bonus} ingredient bonus = ${15+bonus} coins`;
+  const condimentText=chosen?ingredientLabels[chosen]:"none";
+  document.getElementById("mealInfo").textContent=`Current dog dish: condiment ${condimentText}. 15 base coins + ${bonus} ingredient bonus = ${15+bonus} coins. Only one condiment can be added per dish.`;
 }
 function openKitchen(){
   if(rescued.length===0){showPrompt("Rescue a dog first! A dog is needed to make dog dishes.");setTimeout(()=>showPrompt(""),1600);return;}
