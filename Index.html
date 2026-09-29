@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Run Doggies Run 3D</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif}
+#game{position:fixed;inset:0}
+canvas{display:block;width:100%;height:100%;cursor:crosshair}
+#hud{position:fixed;left:12px;top:12px;color:white;background:rgba(0,0,0,.62);padding:12px 14px;border-radius:12px;z-index:5;line-height:1.45;user-select:none}
+#menuBtn{position:fixed;right:12px;top:12px;z-index:10;border:0;border-radius:10px;padding:10px 15px;background:#263b2a;color:white;font-weight:bold;cursor:pointer}
+#menu{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:20}
+.panel{width:min(430px,calc(100% - 30px));max-height:90vh;overflow:auto;background:#1d241f;color:white;border:1px solid #647365;border-radius:16px;padding:20px;box-shadow:0 15px 60px #000}
+.hidden{display:none!important}
+button,input{font:inherit}
+button{background:#38543d;color:white;border:0;border-radius:9px;padding:10px 13px;margin:4px;cursor:pointer}
+button:hover{background:#4c6c52}
+input{background:#111;color:white;border:1px solid #68766b;border-radius:8px;padding:10px;box-sizing:border-box}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+.code{font-size:30px;font-weight:800;letter-spacing:6px;text-align:center;padding:12px;background:#101610;border-radius:10px;margin:10px 0}
+.status{font-size:14px;opacity:.9;margin:10px 0}
+#prompt{position:fixed;left:50%;bottom:15%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:12px 18px;border-radius:12px;z-index:8;display:none}
+.small{font-size:13px;opacity:.8}
+h2{margin-top:0}
+.skinGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-bottom:8px}.skinGrid button{margin:0;font-size:12px}</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <b>Frying Pan Village</b><br>
+  WASD / Arrow Keys: move<br>
+  Mouse: look &nbsp; | &nbsp; E: collect dog / interact<br>
+  ESC: menu
+</div>
+<button id="menuBtn">☰ Menu</button>
+<div id="prompt"></div>
+
+<div id="menu" class="hidden">
+  <div class="panel">
+    <h2>Village Menu</h2>
+    <div class="row">
+      <button id="resume">Resume</button>
+      <button id="skinsOpen">Character</button>
+    </div>
+    <div class="row">
+      <button id="worldOpen">World</button>
+      <button id="multiOpen">Multiplayer</button>
+    </div>
+    <div id="skinsPanel" class="hidden">
+      <h3>Character Skins</h3>
+      <h4>Classic / Eaglercraft-style</h4>
+      <div class="skinGrid">
+        <button data-skin="Steve">Steve</button><button data-skin="TennisSteve">Tennis Steve</button>
+        <button data-skin="TuxedoSteve">Tuxedo Steve</button><button data-skin="AthleteSteve">Athlete Steve</button>
+        <button data-skin="ScottishSteve">Scottish Steve</button><button data-skin="PrisonerSteve">Prisoner Steve</button>
+        <button data-skin="CyclistSteve">Cyclist Steve</button><button data-skin="BoxerSteve">Boxer Steve</button>
+        <button data-skin="Alex">Alex</button><button data-skin="TennisAlex">Tennis Alex</button>
+        <button data-skin="TuxedoAlex">Tuxedo Alex</button><button data-skin="AthleteAlex">Athlete Alex</button>
+        <button data-skin="SwedishAlex">Swedish Alex</button><button data-skin="PrisonerAlex">Prisoner Alex</button>
+        <button data-skin="CyclistAlex">Cyclist Alex</button><button data-skin="BoxerAlex">Boxer Alex</button>
+        <button data-skin="DeveloperAlex">Developer Alex</button><button data-skin="DeveloperSteve">Developer Steve</button>
+      </div>
+      <h4>Brainrot-inspired</h4>
+      <div class="skinGrid">
+        <button data-skin="TungTungSahur">Tung Tung Sahur</button><button data-skin="Tralalero">Tralalero</button>
+        <button data-skin="Bombardiro">Bombardiro Crocodilo</button><button data-skin="BrrBrr">Brr Brr Patapim</button>
+        <button data-skin="Lirili">Lirili Larila</button><button data-skin="Cappuccino">Cappuccino Assassino</button>
+      </div>
+      <h4>Pokémon-inspired</h4>
+      <div class="skinGrid">
+        <button data-skin="Pikachu">Pikachu</button><button data-skin="Charmander">Charmander</button>
+        <button data-skin="Squirtle">Squirtle</button><button data-skin="Bulbasaur">Bulbasaur</button>
+        <button data-skin="Baxcalibur">Baxcalibur</button><button data-skin="Snorlax">Snorlax</button>
+      </div>
+      <h4>Original People</h4>
+      <div class="skinGrid">
+        <button data-skin="Skater">Skater</button><button data-skin="Gamer">Gamer</button>
+        <button data-skin="Scientist">Scientist</button><button data-skin="Astronaut">Astronaut</button>
+        <button data-skin="Tourist">Tourist</button><button data-skin="Musician">Musician</button>
+        <button data-skin="Builder">Builder</button><button data-skin="Detective">Detective</button>
+      </div>
+      <h4>Village</h4>
+      <div class="skinGrid">
+        <button data-skin="Traveler">Traveler</button><button data-skin="Farmer">Farmer</button><button data-skin="Chef">Chef</button>
+      </div>
+    </div>
+    <div id="worldPanel" class="hidden">
+      <h3>Worlds</h3>
+      <button id="newWorld">Create New World</button>
+      <div id="worldList"></div>
+    </div>
+    <div id="multiPanel" class="hidden">
+      <h3>Multiplayer</h3>
+      <p class="small">Create a world code, then give the 6-character code to your friend.</p>
+      <div id="worldCode" class="code">------</div>
+      <input id="joinCode" maxlength="6" placeholder="Enter 6-character code" style="width:100%;text-transform:uppercase">
+      <div class="row">
+        <button id="createSession">Create World Code</button>
+        <button id="joinSession">Join World</button>
+      </div>
+      <button id="copyCode">Copy Code</button>
+      <div id="net" class="status">No multiplayer session.</div>
+      <div id="playerCount" class="status">Players: 1</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+const game=document.getElementById("game");
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x91c9e8);
+scene.fog=new THREE.Fog(0x91c9e8,35,115);
+
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,250);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+game.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xbfe8ff,0x536345,2));
+const sun=new THREE.DirectionalLight(0xfff3d1,2.5);
+sun.position.set(-25,40,20);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+
+function mat(c){return new THREE.MeshStandardMaterial({color:c})}
+function box(x,y,z,w,h,d,c){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));
+  m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;
+}
+function building(x,z,w,d,wall,roof,label){
+  box(x,w*0+2,z,w,4,d,wall);
+  box(x,4.35,z,w+.4,.7,d+.4,roof);
+  const sign=document.createElement("canvas");sign.width=600;sign.height=100;
+  const ctx=sign.getContext("2d");ctx.fillStyle="rgba(0,0,0,.78)";ctx.roundRect(8,8,584,84,18);ctx.fill();
+  ctx.fillStyle="white";ctx.font="bold 48px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,300,50);
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(sign),transparent:true,depthTest:false}));
+  sprite.position.set(x,7,z);sprite.scale.set(8,1.35,1);scene.add(sprite);
+}
+function tree(x,z){
+  box(x,1.2,z,.9,2.4,.9,0x70452c);
+  const crown=new THREE.Mesh(new THREE.SphereGeometry(2.5,12,9),mat(0x3e7e43));
+  crown.position.set(x,3.5,z);crown.castShadow=true;scene.add(crown);
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),mat(0x67a85d));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+for(let i=0;i<28;i++){
+  const x=(Math.random()-.5)*105,z=(Math.random()-.5)*90;
+  if(Math.abs(x)<32&&Math.abs(z)<30){i--;continue}
+  tree(x,z);
+}
+building(-18,-12,16,11,0xd88e5d,0x8c452e,"KITCHEN");
+building(18,-12,16,11,0xd5b060,0x98503b,"MARKET");
+building(0,20,19,11,0xc86d5c,0x71372e,"TEMPLE");
+
+const character=new THREE.Group();scene.add(character);
+let skin="Traveler";
+const skins={
+  // Classic Minecraft/Eaglercraft-style palette variants.
+  Steve:[0x4b7fc4,0x5b3b25,0xc98e67,0x315d8c], TennisSteve:[0xffffff,0x2f7d32,0xf1c27d,0xffffff],
+  TuxedoSteve:[0x202020,0x101010,0xc98e67,0xd9a72e], AthleteSteve:[0xf0f0f0,0x3a73a8,0x8d5524,0xd9a72e],
+  ScottishSteve:[0x8e1f2d,0x242424,0xc98e67,0xb33a3a], PrisonerSteve:[0xd9d9d9,0x7d7d7d,0xf0d2c0,0xffffff],
+  CyclistSteve:[0xd62f2f,0x252525,0xc98e67,0xffffff], BoxerSteve:[0xe1e1e1,0xa51f25,0xf0b27a,0xd9a72e],
+  Alex:[0x5a9b52,0x76502e,0xf0b27a,0xd67b35], TennisAlex:[0xffffff,0x2f7d32,0x6f4930,0xffffff],
+  TuxedoAlex:[0x252525,0x111111,0xf0b27a,0xd9a72e], AthleteAlex:[0xd62f2f,0x293f9a,0xc98e67,0xd9a72e],
+  SwedishAlex:[0x2f66b0,0xd9c44b,0xf0b27a,0xd9c44b], PrisonerAlex:[0xd9d9d9,0x7d7d7d,0xf0b27a,0xffffff],
+  CyclistAlex:[0x4e3a8e,0x252525,0xf0b27a,0x4e9bd6], BoxerAlex:[0xf4e7d0,0xb51f2a,0x8d5524,0x2f66b0],
+  DeveloperAlex:[0x777777,0x333333,0xf0b27a,0x555555], DeveloperSteve:[0x777777,0x333333,0xc98e67,0x555555],
+  // Brainrot-inspired color themes (original game interpretations).
+  TungTungSahur:[0x9b5b2a,0x5b321b,0xd9a27a,0xd9a72e], Tralalero:[0x2f78a8,0x17425d,0x8d5524,0x6bc1e8],
+  Bombardiro:[0x65704f,0x343b2a,0xb67b52,0xd9a72e], BrrBrr:[0x5b8e3b,0x27451f,0x8d5524,0x9bcf63],
+  Lirili:[0xd4a24c,0x74411e,0xc98e67,0xe6c45e], Cappuccino:[0x7a4b2a,0x3b2415,0xc98e67,0xd9a72e],
+  // Pokémon-inspired color themes.
+  Pikachu:[0xf3d33b,0x8a5b16,0xf0c27b,0xd62f2f], Charmander:[0xe36b35,0x7d3b24,0xf0b27a,0xf2a63a],
+  Squirtle:[0x4aa5c8,0x7a4b2a,0x8d5524,0xd7c58a], Bulbasaur:[0x5c9f58,0x4c6338,0x8d5524,0x8e5ca6],
+  Baxcalibur:[0x4b6f8a,0x27384a,0x9b7655,0xd9e7f2], Snorlax:[0x5b79a5,0x273d67,0x7d5a42,0xd6d6d6],
+  // Original people.
+  Skater:[0x2f75b5,0x333333,0xc98e67,0xf2f2f2], Gamer:[0x6b3bb5,0x242424,0xd19a70,0x2ee66b],
+  Scientist:[0xf2eee2,0x3b4a60,0xd19a70,0xdddddd], Astronaut:[0xe8e8e8,0x394b63,0xc98e67,0xb8c7d9],
+  Tourist:[0xe6a33b,0x5b7a3e,0xc98e67,0x3f86c7], Musician:[0x9b3b78,0x202020,0x8d5524,0xd9a72e],
+  Builder:[0xe08a2e,0x34516b,0xc98e67,0x3d3d3d], Detective:[0x3f4b5c,0x292929,0xc98e67,0x6e5a3a],
+  Traveler:[0x315d8c,0x393d49,0xc98e67,0xb54d38], Farmer:[0x4d7c4b,0x67472f,0xd19a70,0xd1a43e],
+  Chef:[0xf2eee2,0x33363b,0xc98e67,0xf2eee2]
+};
+function buildCharacter(){
+  while(character.children.length)character.remove(character.children[0]);
+  const [shirt,pants,skinC,hatC]=skins[skin];
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.62,1.1,5,10),mat(shirt));body.position.y=1.55;body.castShadow=true;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.36,16,12),mat(skinC));head.position.y=2.45;head.castShadow=true;
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.2,16),mat(hatC));hat.position.y=2.82;hat.castShadow=true;
+  const pan=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.12,20),mat(0x292929));pan.rotation.x=Math.PI/2;pan.position.set(.72,1.2,0);pan.castShadow=true;
+  const handle=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.9,10),mat(0x333333));handle.rotation.z=Math.PI/2;handle.position.set(1.05,1.2,0);
+  character.add(body,head,hat,pan,handle);
+}
+buildCharacter();
+
+function dogModel(color,spot){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.43,.75,5,10),mat(color));body.rotation.z=Math.PI/2;body.position.y=.65;body.castShadow=true;g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),mat(color));head.position.set(.48,.9,0);head.castShadow=true;g.add(head);
+  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),mat(0xe6d0b0));muzzle.position.set(.72,.82,0);g.add(muzzle);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(.08,8,6),mat(0x171717));nose.position.set(.85,.87,0);g.add(nose);
+  for(const z of [-.2,.2]){
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.55,8),mat(color));leg.position.set(.18,.3,z);g.add(leg);
+    const leg2=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.55,8),mat(color));leg2.position.set(-.3,.3,z);g.add(leg2);
+  }
+  const tail=new THREE.Mesh(new THREE.CylinderGeometry(.07,.1,.55,8),mat(color));tail.rotation.z=-.8;tail.position.set(-.55,.9,0);g.add(tail);
+  if(spot){
+    const s=new THREE.Mesh(new THREE.SphereGeometry(.18,10,8),mat(spot));s.scale.set(1,.5,1);s.position.set(-.05,.92,.28);g.add(s);
+  }
+  return g;
+}
+const dogs=[
+ {name:"Bao",color:0xd39b55,spot:null,x:-11,z:-3},
+ {name:"Mochi",color:0xc9783d,spot:0xffffff,x:12,z:1},
+ {name:"Pepper",color:0x252525,spot:null,x:-7,z:11},
+ {name:"Luna",color:0xe9e2d4,spot:0x333333,x:10,z:16}
+];
+dogs.forEach(d=>{d.group=dogModel(d.color,d.spot);d.group.position.set(d.x,.05,d.z);d.rescued=false;scene.add(d.group)});
+
+let rescued=[];
+let coins=0,meals=0;
+let yaw=0,pitch=.12;
+let keys={};
+let pointerLocked=false;
+const promptEl=document.getElementById("prompt");
+
+function nearestWildDog(){
+  let best=null,bd=2.8;
+  for(const d of dogs){
+    if(d.rescued)continue;
+    const dist=character.position.distanceTo(d.group.position);
+    if(dist<bd){bd=dist;best=d}
+  }
+  return best;
+}
+function showPrompt(t){promptEl.textContent=t;promptEl.style.display=t?"block":"none"}
+
+function collectDog(){
+  const d=nearestWildDog();
+  if(!d)return false;
+  d.rescued=true;rescued.push(d);
+  const name=prompt("Give your dog a name:",d.name);
+  if(name)d.name=name;
+  showPrompt(d.name+" joined you!");
+  setTimeout(()=>showPrompt(""),1200);
+  return true;
+}
+
+function interact(){
+  if(collectDog())return;
+  const kitchen=new THREE.Vector3(-18,0,-12);
+  const market=new THREE.Vector3(18,0,-12);
+  const temple=new THREE.Vector3(0,0,20);
+  if(character.position.distanceTo(kitchen)<7){
+    meals++;showPrompt("You cooked a vegetable village dish. Your dogs stay safe!");
+    setTimeout(()=>showPrompt(""),1400);return;
+  }
+  if(character.position.distanceTo(market)<7&&meals>0){
+    meals--;coins+=15;showPrompt("Sold a meal for 15 coins!");setTimeout(()=>showPrompt(""),1200);return;
+  }
+  if(character.position.distanceTo(temple)<7){
+    showPrompt("The village temple is peaceful.");setTimeout(()=>showPrompt(""),1200);
+  }
+}
+
+function openMenu(){
+  document.exitPointerLock?.();
+  document.getElementById("menu").classList.remove("hidden");
+}
+function lock(){
+  document.getElementById("menu").classList.add("hidden");
+  renderer.domElement.requestPointerLock?.();
+}
+document.getElementById("menuBtn").onclick=openMenu;
+document.getElementById("resume").onclick=lock;
+document.querySelectorAll("[data-skin]").forEach(b=>b.onclick=()=>{skin=b.dataset.skin;buildCharacter()});
+document.getElementById("skinsOpen").onclick=()=>document.getElementById("skinsPanel").classList.toggle("hidden");
+document.getElementById("worldOpen").onclick=()=>document.getElementById("worldPanel").classList.toggle("hidden");
+document.getElementById("multiOpen").onclick=()=>document.getElementById("multiPanel").classList.toggle("hidden");
+document.getElementById("newWorld").onclick=()=>{coins=0;meals=0;rescued=[];dogs.forEach(d=>{d.rescued=false;d.group.visible=true});character.position.set(0,0,0);openMenu()};
+document.querySelectorAll(".panel .back").forEach(b=>b.onclick=openMenu);
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.preventDefault();openMenu();return}
+  if(["INPUT","TEXTAREA"].includes(document.activeElement.tagName))return;
+  keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==="e")interact();
+});
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+renderer.domElement.addEventListener("click",()=>{
+  if(document.getElementById("menu").classList.contains("hidden"))renderer.domElement.requestPointerLock?.();
+});
+document.addEventListener("pointerlockchange",()=>{pointerLocked=document.pointerLockElement===renderer.domElement});
+
+renderer.domElement.addEventListener("mousemove",e=>{
+  if(!pointerLocked)return;
+  yaw-=e.movementX*.0025;
+  pitch-=e.movementY*.002;
+  pitch=Math.max(-.35,Math.min(.65,pitch));
+});
+
+function updateMovement(){
+  let f=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
+  let st=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+  const len=Math.hypot(f,st)||1;f/=len;st/=len;
+  if(f||st){
+    const fx=-Math.sin(yaw),fz=-Math.cos(yaw);
+    const rx=Math.cos(yaw),rz=-Math.sin(yaw);
+    const mx=fx*f+rx*st,mz=fz*f+rz*st;
+    character.position.x+=mx*.16;character.position.z+=mz*.16;
+    character.rotation.y=Math.atan2(mx,mz);
+  }
+  character.position.x=Math.max(-65,Math.min(65,character.position.x));
+  character.position.z=Math.max(-55,Math.min(55,character.position.z));
+}
+function updateDogs(){
+  rescued.forEach((d,i)=>{
+    const angle=.7+i*.65;
+    const target=character.position.clone().add(new THREE.Vector3(Math.sin(angle)*.9,.15,Math.cos(angle)*.9));
+    d.group.position.lerp(target,.12);
+    d.group.rotation.y=character.rotation.y;
+    d.group.scale.set(.72,.72,.72);
+  });
+}
+function updateCamera(){
+  const dist=7;
+  const target=character.position.clone();target.y=1.6;
+  camera.position.set(
+    character.position.x+Math.sin(yaw)*dist*Math.cos(pitch),
+    3.8+Math.sin(pitch)*dist,
+    character.position.z+Math.cos(yaw)*dist*Math.cos(pitch)
+  );
+  camera.lookAt(target);
+}
+function animate(){
+  requestAnimationFrame(animate);
+  updateMovement();updateDogs();updateCamera();
+  const d=nearestWildDog();
+  if(d)showPrompt("Press E to collect "+d.name);
+  else if(promptEl.textContent.startsWith("Press E"))showPrompt("");
+  sendPlayerState();
+  renderer.render(scene,camera);
+}
+window.addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+
+/* Multiplayer */
+let peer=null,myPeerId="",connections=[],remotePlayers=new Map();
+function code(){const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<6;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
+function net(t){document.getElementById("net").textContent=t}
+function count(){document.getElementById("playerCount").textContent="Players: "+(1+remotePlayers.size)}
+function remoteChar(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.7,1.1,.45),mat(0x4f7cff));b.position.y=1.3;
+  const h=new THREE.Mesh(new THREE.SphereGeometry(.35,14,10),mat(0xffc99a));h.position.y=2.05;
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.18,14),mat(0xd34b35));hat.position.y=2.38;
+  g.add(b,h,hat);scene.add(g);return g;
+}
+function clearRemote(){remotePlayers.forEach(r=>scene.remove(r));remotePlayers.clear();count()}
+function setupConn(c){
+  connections.push(c);
+  c.on("open",()=>{net("Connected! Another player can now appear in the village.");sendPlayerState()});
+  c.on("data",m=>{
+    if(!m||m.id===myPeerId)return;
+    if(m.type==="state"){
+      let r=remotePlayers.get(m.id);if(!r){r=remoteChar();remotePlayers.set(m.id,r)}
+      r.position.set(+m.x||0,0,+m.z||0);r.rotation.y=+m.rot||0;count();
+    }
+  });
+  c.on("close",()=>{if(remotePlayers.has(c.peer)){scene.remove(remotePlayers.get(c.peer));remotePlayers.delete(c.peer);count()}});
+}
+function sendPlayerState(){
+  if(!myPeerId)return;
+  const m={type:"state",id:myPeerId,x:character.position.x,z:character.position.z,rot:character.rotation.y};
+  connections=connections.filter(c=>c&&c.open);connections.forEach(c=>{try{c.send(m)}catch(e){}});
+}
+function createSession(){
+  clearRemote();connections.forEach(c=>{try{c.close()}catch(e){}});connections=[];
+  const c=code();document.getElementById("worldCode").textContent=c;document.getElementById("joinCode").value=c;
+  if(typeof Peer==="undefined"){net("Multiplayer library failed to load.");return}
+  net("Creating world...");
+  peer=new Peer(c);
+  peer.on("open",id=>{myPeerId=id;document.getElementById("worldCode").textContent=id.toUpperCase();document.getElementById("joinCode").value=id.toUpperCase();net("World ready! Share code "+id.toUpperCase())});
+  peer.on("connection",setupConn);
+  peer.on("error",e=>net("Host error: "+(e.type||"network error")));
+}
+function joinSession(){
+  const c=document.getElementById("joinCode").value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(c.length!==6){net("Enter exactly 6 characters.");return}
+  clearRemote();connections.forEach(x=>{try{x.close()}catch(e){}});connections=[];
+  if(typeof Peer==="undefined"){net("Multiplayer library failed to load.");return}
+  net("Joining "+c+"...");
+  peer=new Peer();
+  peer.on("open",id=>{myPeerId=id;const con=peer.connect(c,{reliable:true});setupConn(con);setTimeout(()=>{if(!con.open)net("Could not connect. Check the code and make sure the host is still in the world.")},10000)});
+  peer.on("error",e=>net("Could not join: "+(e.type||"network error")));
+}
+document.getElementById("createSession").onclick=createSession;
+document.getElementById("joinSession").onclick=joinSession;
+document.getElementById("copyCode").onclick=async()=>{
+  const c=document.getElementById("worldCode").textContent;
+  if(c==="------")return;
+  try{await navigator.clipboard.writeText(c);net("Copied code "+c)}catch(e){net("Code: "+c)}
+};
+
+animate();
+</script>
+</body>
+</html>
