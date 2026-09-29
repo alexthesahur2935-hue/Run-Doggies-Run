@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Run Doggies Run 3D</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:Arial,sans-serif}
+#game{position:fixed;inset:0}
+canvas{display:block;width:100%;height:100%;cursor:crosshair}
+#hud{position:fixed;left:12px;top:12px;color:white;background:rgba(0,0,0,.62);padding:12px 14px;border-radius:12px;z-index:5;line-height:1.45;user-select:none}
+#menuBtn{position:fixed;right:12px;top:12px;z-index:10;border:0;border-radius:10px;padding:10px 15px;background:#263b2a;color:white;font-weight:bold;cursor:pointer}
+#menu{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:20}
+.panel{width:min(430px,calc(100% - 30px));max-height:90vh;overflow:auto;background:#1d241f;color:white;border:1px solid #647365;border-radius:16px;padding:20px;box-shadow:0 15px 60px #000}
+.hidden{display:none!important}
+button,input{font:inherit}
+button{background:#38543d;color:white;border:0;border-radius:9px;padding:10px 13px;margin:4px;cursor:pointer}
+button:hover{background:#4c6c52}
+input{background:#111;color:white;border:1px solid #68766b;border-radius:8px;padding:10px;box-sizing:border-box}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+.code{font-size:30px;font-weight:800;letter-spacing:6px;text-align:center;padding:12px;background:#101610;border-radius:10px;margin:10px 0}
+.status{font-size:14px;opacity:.9;margin:10px 0}
+#prompt{position:fixed;left:50%;bottom:15%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:12px 18px;border-radius:12px;z-index:8;display:none}
+.small{font-size:13px;opacity:.8}
+h2{margin-top:0}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <b>Run Doggies Run</b><br>
+  WASD / Arrow Keys: move<br>
+  Mouse: look &nbsp; | &nbsp; E: collect dog / interact<br>
+  ESC: menu
+</div>
+<button id="menuBtn">☰ Menu</button>
+<div id="prompt"></div>
+<div id="shopMenu" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:30;display:flex;align-items:center;justify-content:center">
+  <div class="panel">
+    <h2>Shop</h2><p>Buy ingredients with coins.</p>
+    <div id="shopItems"></div><button id="shopClose">Close</button>
+  </div>
+</div>
+<div id="kitchenMenu" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:30;display:flex;align-items:center;justify-content:center">
+  <div class="panel">
+    <h2>Dog Dish Kitchen</h2><p id="mealInfo">Add purchased ingredients to your next dog dish.</p>
+    <div id="kitchenItems"></div><button id="makeDish">Make Dog Dish</button><button id="kitchenClose">Close</button>
+  </div>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="panel">
+    <h2>🏮 Chinese Dog Village</h2>
+    <label for="username"><b>Username</b></label><input id="username" maxlength="20" placeholder="Enter your username" autocomplete="off" style="width:100%;margin:8px 0 12px">
+    <div class="row">
+      <button id="resume">Resume</button>
+      <button id="skinsOpen">Character</button>
+    </div>
+    <div class="row">
+      <button id="worldOpen">World</button>
+      <button id="multiOpen">Multiplayer</button>
+    </div>
+    <div id="skinsPanel" class="hidden">
+      <h3>Character Skins</h3>
+      <p class="small">Eaglercraft 1.5.2 defaults, brainrot, Pokémon, and original people.</p>
+      <div id="skinCategories"></div>
+    </div>
+    <div id="worldPanel" class="hidden">
+      <h3>Worlds</h3>
+      <div class="row">
+        <button id="newWorld">Create New World</button>
+        <button id="exportWorld">Export Worlds</button>
+        <button id="importWorld">Import Worlds</button>
+        <input id="worldFile" type="file" accept="application/json,.json" class="hidden">
+      </div>
+      <div id="worldList"></div>
+    </div>
+    <div id="multiPanel" class="hidden">
+      <h3>Multiplayer</h3>
+      <p class="small">Create a world code, then give the 6-character code to your friend.</p>
+      <div id="worldCode" class="code">------</div>
+      <input id="joinCode" maxlength="6" placeholder="Enter 6-character code" style="width:100%;text-transform:uppercase">
+      <div class="row">
+        <button id="createSession">Create World Code</button>
+        <button id="joinSession">Join World</button>
+      </div>
+      <button id="copyCode">Copy Code</button>
+      <div id="net" class="status">No multiplayer session.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+const game=document.getElementById("game");
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x91c9e8);
+scene.fog=new THREE.Fog(0x91c9e8,35,115);
+
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,250);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+game.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xbfe8ff,0x536345,2));
+const sun=new THREE.DirectionalLight(0xfff3d1,2.5);
+sun.position.set(-25,40,20);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+
+function mat(c){return new THREE.MeshStandardMaterial({color:c})}
+const buildingColliders=[]; // corner-post colliders only; building interiors have no invisible walls
+const treeColliders=[];
+const furnitureColliders=[];
+const roofPoleColliders=[];
+const roofSurfaces=[];
+function box(x,y,z,w,h,d,c){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c));
+  m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;
+}
+function chineseLantern(x,y,z){
+  const red=mat(0xb51f2a), gold=mat(0xd9a72e);
+  const body=new THREE.Mesh(new THREE.SphereGeometry(.34,12,10),red);
+  body.scale.set(.82,1.15,.82); body.position.set(x,y,z); body.castShadow=true; scene.add(body);
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.08,12),gold); top.position.set(x,y+.39,z); scene.add(top);
+  const tassel=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.45,8),gold); tassel.position.set(x,y-.5,z); scene.add(tassel);
+}
+function chineseRoof(x,z,w,d,roof){
+  const ridge=box(x,5.05,z,.5,w*.96,.5,roof);
+  // Decorative roof ridge/poles are solid when the player reaches their height.
+  roofPoleColliders.push({x,z,w:.72,d:w*.96+.18,top:5.3});
+  for(let i=0;i<3;i++){
+    const inset=i*.55, y=4.9-i*.08, rw=w+.7-inset*2, rd=d+.7-inset*2;
+    box(x, y, z, rw, .16, rd, roof);
+  }
+  chineseLantern(x-w*.38,3.15,z-d*.52); chineseLantern(x+w*.38,3.15,z-d*.52);
+}
+function building(x,z,w,d,wall,roof,label){
+  // Open-sided building: roof plus four sturdy corner posts, no walls.
+  const post=.7;
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+    box(x+sx*(w/2-post/2),2,z+sz*(d/2-post/2),post,4,post,wall);
+  }
+  box(x,4.35,z,w+.4,.7,d+.4,roof);
+  const sign=document.createElement("canvas");sign.width=600;sign.height=100;
+  const ctx=sign.getContext("2d");ctx.fillStyle="rgba(0,0,0,.78)";ctx.roundRect(8,8,584,84,18);ctx.fill();
+  ctx.fillStyle="white";ctx.font="bold 48px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(label,300,50);
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(sign),transparent:true,depthTest:false}));
+  sprite.position.set(x,7,z);sprite.scale.set(8,1.35,1);scene.add(sprite);
+  // Only the four corner posts are solid at ground level. The building interior stays open.
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+    buildingColliders.push({x:x+sx*(w/2-post/2),z:z+sz*(d/2-post/2),w:post+.18,d:post+.18,top:4});
+  }
+  // The roof itself is a walkable surface, not a wall around the building.
+  roofSurfaces.push({x,z,w:w+.4,d:d+.4,top:4.7});
+}
+function tree(x,z){
+  box(x,1.2,z,.9,2.4,.9,0x70452c);
+  const crown=new THREE.Mesh(new THREE.SphereGeometry(2.5,12,9),mat(0x3e7e43));
+  crown.position.set(x,3.5,z);crown.castShadow=true;scene.add(crown);
+  treeColliders.push({x,z,r:2.45,top:3.1});
+}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),mat(0x67a85d));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+for(let i=0;i<28;i++){
+  const x=(Math.random()-.5)*105,z=(Math.random()-.5)*90;
+  if(Math.abs(x)<32&&Math.abs(z)<30){i--;continue}
+  tree(x,z);
+}
+building(-18,-12,16,11,0xb9473d,0x5a1717,"厨房 · KITCHEN"); chineseRoof(-18,-12,16,11,0x451010);
+building(18,-12,16,11,0xd09b36,0x6b1b1b,"餐馆 · RESTAURANT"); chineseRoof(18,-12,16,11,0x4f1212);
+building(0,20,19,11,0xc82f3a,0x531313,"寺庙 · TEMPLE"); chineseRoof(0,20,19,11,0x350b0b);
+building(25,18,11,9,0xb64037,0x5b1515,"商店 · SHOP"); chineseRoof(25,18,11,9,0x3e0c0c);
+
+// Temple: a traditional Chinese dong drum hanging beneath the front eave.
+function dongDrum(x,z){
+  const wood=mat(0x6b321e), red=mat(0xb92828), gold=mat(0xd9a72e);
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(8,.28,.35),wood);
+  beam.position.set(x,5.9,z-5.7);beam.castShadow=true;scene.add(beam);
+  for(const sx of [-2.7,2.7]){
+    const rope=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1.5,8),mat(0x3f2a1c));
+    rope.position.set(x+sx,5.15,z-5.7);scene.add(rope);
+  }
+  const drum=new THREE.Mesh(new THREE.CylinderGeometry(1.45,1.45,.8,32),red);
+  drum.rotation.x=Math.PI/2;drum.position.set(x,4.25,z-5.7);drum.castShadow=true;scene.add(drum);
+  for(const zz of [-.43,.43]){
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(1.47,.09,8,32),gold);
+    rim.rotation.x=Math.PI/2;rim.position.set(x,4.25,z-5.7+zz);scene.add(rim);
+  }
+  const center=new THREE.Mesh(new THREE.CircleGeometry(.82,32),gold);
+  center.position.set(x,4.25,z-6.12);center.rotation.x=Math.PI/2;scene.add(center);
+  const chinese=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,.08),gold);
+  // Decorative tassels and mallets.
+  for(const sx of [-1.75,1.75]){
+    const tassel=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),red);
+    tassel.position.set(x+sx,3.55,z-5.7);scene.add(tassel);
+  }
+}
+
+function addFurnitureCollider(x,z,w,d,top=2.8){furnitureColliders.push({x,z,w,d,top});}
+
+// Kitchen: a small outdoor spice stand with jars of salt, pepper and herbs.
+function spiceStand(x,z){
+  const wood=mat(0x70482b), shelf=mat(0x9b6538);
+  box(x,1.25,z,4.8,.22,1.5,wood);
+  box(x,2.45,z,4.8,.22,1.5,wood);
+  addFurnitureCollider(x,z,4.8,1.5,2.56);
+  for(const sx of [-2.1,2.1])box(x+sx,1.85,z,.18,1.6,.18,wood);
+  const items=[[-1.45,0xe9e2cf,"SALT"],[-.5,0x302b27,"PEPPER"],[.5,0x5b7b3c,"HERBS"],[1.45,0xd9a441,"SPICE"]];
+  items.forEach(([sx,c,label])=>{
+    const jar=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,.55,12),mat(c));
+    jar.position.set(x+sx,2.82,z);jar.castShadow=true;scene.add(jar);
+    const lid=new THREE.Mesh(new THREE.CylinderGeometry(.3,.3,.07,12),shelf);
+    lid.position.set(x+sx,3.13,z);scene.add(lid);
+  });
+}
+
+// Restaurant: dining tables, chairs and a serving counter in front of the market building.
+function restaurantFurniture(x,z){
+  const wood=mat(0x70452c), cloth=mat(0xc24c3e);
+  box(x,1.15,z,5.2,.22,2.2,wood);
+  box(x,2.25,z,5.2,.18,2.2,wood);
+  addFurnitureCollider(x,z,5.2,2.2,2.45);
+  // serving counter
+  box(x,1.05,z-4.2,10,.3,1.2,wood);
+  box(x,2.05,z-4.2,10,.18,1.2,cloth);
+  addFurnitureCollider(x,z-4.2,10,1.2,2.2);
+  for(const sx of [-2.8,0,2.8]){
+    const table=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.16,20),wood);
+    table.position.set(x+sx,z===-12?0:0,z);
+    table.position.y=1.55;scene.add(table);
+    for(const dz of [-1.35,1.35]){
+      const seat=new THREE.Mesh(new THREE.BoxGeometry(1,.65,1),wood);
+      seat.position.set(x+sx,0.75,z+dz);seat.castShadow=true;scene.add(seat);
+      addFurnitureCollider(x+sx,z+dz,1,1,1.08);
+    }
+  }
+}
+
+dongDrum(0,20);
+spiceStand(-18,-18.2);
+restaurantFurniture(18,-12);
+function shopFurniture(x,z){
+  const wood=mat(0x70452c), shelf=mat(0x9b6538);
+  box(x,1.15,z,8,.22,1.4,wood);
+  addFurnitureCollider(x,z,8,1.4,1.35);
+  for(const dz of [-3,0,3]){
+    box(x,2.3,z+dz/3,7.5,.18,1.1,shelf);
+  }
+  box(x,1.25,z-3.5,7.5,2.2,.45,wood);
+  addFurnitureCollider(x,z-3.5,7.5,.45,2.4);
+}
+shopFurniture(25,18);
+
+const character=new THREE.Group();scene.add(character);
+let skin="Traveler";
+let username=localStorage.getItem("runDoggiesRunUsername")||"Player";
+const skins={
+  Traveler:[0x315d8c,0x393d49,0xc98e67,0xb54d38],
+  Farmer:[0x4d7c4b,0x67472f,0xd19a70,0xd1a43e],
+  Chef:[0xf2eee2,0x33363b,0xc98e67,0xf2eee2],
+
+  "Steve (Eaglercraft 1.5.2)":[0x3f7fc4,0x3b3027,0x8d5b3f,0x2d2420],
+  "Alex (Eaglercraft 1.5.2)":[0x6b9b43,0x5b4639,0xe0a77b,0xc96a2b],
+
+  "Tralalero Tralala":[0x4c78c9,0x263b73,0x8c6a50,0xe8e8e8],
+  "Tung Tung Tung Sahur":[0x8a4f2a,0x3a2118,0x8d5b3f,0xd6a23a],
+  "Brr Brr Patapim":[0x5c7b35,0x3f5125,0x7d563c,0x6a3b22],
+  "Lirili Larila":[0x4e8d62,0x36573e,0x9c6a45,0xd8b98a],
+  "Bombardiro Crocodilo":[0x4b7f52,0x39483e,0x667a5a,0x9a9a9a],
+  "Cappuccino Assassino":[0x6b4b35,0x34251d,0xb47b4d,0xeee0c0],
+  "Chimpanzini Bananini":[0x6f4a2d,0x39251b,0x8d5b3f,0xe5c13a],
+  "Frigo Camelo":[0x91c8d8,0x596f79,0xb78f6a,0xf0f0f0],
+  "Ballerina Cappuccina":[0xf0c9c7,0x5a3140,0xd5a17a,0xe9e9e9],
+  "La Vaca Saturno Saturnita":[0xeee6d2,0x6f5b4b,0x8f6d58,0x5d3c8a],
+
+  "Pikachu":[0xf5d32f,0x9a6f17,0xf3c38b,0x8b1d24],
+  "Charizard":[0xe85b3a,0x563a2c,0xc98e67,0xf1a33a],
+  "Bulbasaur":[0x78a84b,0x4e6432,0x7e5a3f,0x8b5a9d],
+  "Squirtle":[0x65b7c6,0x315f70,0x9a6f4d,0x9b6b43],
+  "Gengar":[0x66508f,0x3b2d57,0xb9a4c8,0xe6e0ff],
+  "Lucario":[0x4d78a8,0x2e405c,0x8b6248,0x8f9aa5],
+  "Greninja":[0x3d6f9d,0x273f63,0x8d5b6b,0x2b2b3b],
+  "Snorlax":[0x4f6e9d,0x33445d,0x9b7652,0x2f5035],
+  "Baxcalibur":[0x5b6678,0x303846,0x8c6755,0x91a5b8],
+  "Mewtwo":[0xa9a2c8,0x625b7b,0xd3aa93,0x6e5f9a],
+
+  "Skater":[0xe35b44,0x2f3545,0xb67c5a,0x3b79a8],
+  "Hoodie":[0x39404d,0x1f252d,0x8b6248,0x59626f],
+  "Soccer Player":[0xf0f0f0,0x263a52,0x9d6a4c,0x39a45b],
+  "Astronaut":[0xdfe7ed,0x263447,0xc88d70,0x8fb3c9],
+  "Gamer":[0x6b43a1,0x252538,0xd09a76,0x35c7b7],
+  "Punk":[0x3b3b46,0x241f2a,0xc18a68,0xd83f68],
+  "Detective":[0x6e5845,0x3a302c,0xb47a7a,0x2d2d2d],
+  "Tourist":[0x3e8d83,0x7d6248,0xd09a78,0xe5b84a],
+  "Scientist":[0xe8e8e8,0x4b5260,0xc58e72,0x4c9ac0],
+  "Musician":[0x7a3f8e,0x272b3b,0x8f5c4b,0xd5b53f]
+};
+
+const skinGroups=[
+  ["Eaglercraft 1.5.2 Defaults",["Steve (Eaglercraft 1.5.2)","Alex (Eaglercraft 1.5.2)"]],
+  ["Original Village",["Traveler","Farmer","Chef"]],
+  ["Brainrot",["Tralalero Tralala","Tung Tung Tung Sahur","Brr Brr Patapim","Lirili Larila","Bombardiro Crocodilo","Cappuccino Assassino","Chimpanzini Bananini","Frigo Camelo","Ballerina Cappuccina","La Vaca Saturno Saturnita"]],
+  ["Pokémon",["Pikachu","Charizard","Bulbasaur","Squirtle","Gengar","Lucario","Greninja","Snorlax","Baxcalibur","Mewtwo"]],
+  ["Original People",["Skater","Hoodie","Soccer Player","Astronaut","Gamer","Punk","Detective","Tourist","Scientist","Musician"]]
+];
+
+function renderSkinButtons(){
+  const root=document.getElementById("skinCategories");
+  if(!root)return;
+  root.innerHTML="";
+  skinGroups.forEach(([title,names])=>{
+    const section=document.createElement("div");
+    section.style.marginBottom="12px";
+    const h=document.createElement("div");
+    h.textContent=title;
+    h.style.fontWeight="800";
+    h.style.margin="8px 0 4px";
+    section.appendChild(h);
+    const row=document.createElement("div");
+    row.className="row";
+    names.forEach(name=>{
+      const b=document.createElement("button");
+      b.textContent=(name===skin?"✓ ":"")+name;
+      b.dataset.skin=name;
+      b.onclick=()=>{
+        skin=name;
+        buildCharacter();
+        renderSkinButtons();
+        sendPlayerState(true);
+      };
+      row.appendChild(b);
+    });
+    section.appendChild(row);
+    root.appendChild(section);
+  });
+}
+
+function buildCharacterInto(group,skinName=skin){
+  while(group.children.length)group.remove(group.children[0]);
+  const [shirt,pants,skinC,hatC]=skins[skinName]||skins.Traveler;
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.62,1.1,5,10),mat(shirt));body.position.y=1.55;body.castShadow=true;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.36,16,12),mat(skinC));head.position.y=2.45;head.castShadow=true;
+  const hat=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,.2,16),mat(hatC));hat.position.y=2.82;hat.castShadow=true;
+  const legs=new THREE.Mesh(new THREE.BoxGeometry(.78,.65,.46),mat(pants));legs.position.y=.72;legs.castShadow=true;
+  group.add(body,head,hat,legs);
+  return group;
+}
+
+function buildCharacter(){
+  buildCharacterInto(character,skin);
+  const pan=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.12,20),mat(0x292929));pan.rotation.x=Math.PI/2;pan.position.set(.72,1.2,0);pan.castShadow=true;
+  const handle=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.9,10),mat(0x333333));handle.rotation.z=Math.PI/2;handle.position.set(1.05,1.2,0);
+  character.add(pan,handle);
+}
+renderSkinButtons();
+buildCharacter();
+
+function dogModel(color,spot){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.43,.75,5,10),mat(color));body.rotation.z=Math.PI/2;body.position.y=.65;body.castShadow=true;g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,14,10),mat(color));head.position.set(.48,.9,0);head.castShadow=true;g.add(head);
+  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),mat(0xe6d0b0));muzzle.position.set(.72,.82,0);g.add(muzzle);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(.08,8,6),mat(0x171717));nose.position.set(.85,.87,0);g.add(nose);
+  for(const z of [-.2,.2]){
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.55,8),mat(color));leg.position.set(.18,.3,z);g.add(leg);
+    const leg2=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,.55,8),mat(color));leg2.position.set(-.3,.3,z);g.add(leg2);
+  }
+  const tail=new THREE.Mesh(new THREE.CylinderGeometry(.07,.1,.55,8),mat(color));tail.rotation.z=-.8;tail.position.set(-.55,.9,0);g.add(tail);
+  if(spot){
+    const s=new THREE.Mesh(new THREE.SphereGeometry(.18,10,8),mat(spot));s.scale.set(1,.5,1);s.position.set(-.05,.92,.28);g.add(s);
+  }
+  return g;
+}
+let dogs=[];
+
+function spawnDog(){
+  const colors=[0xd39b55,0xc9783d,0x252525,0xe9e2d4,0x8b5a3c,0xb7b7b7];
+  const spots=[null,0xffffff,null,0x333333,0xe6d0b0,null];
+  const names=["Buddy","Coco","Daisy","Rusty","Scout","Toby","Poppy","Max"];
+  const d={
+    name:names[Math.floor(Math.random()*names.length)],
+    color:colors[Math.floor(Math.random()*colors.length)],
+    spot:spots[Math.floor(Math.random()*spots.length)],
+    x:0,z:14.5,rescued:false,
+    wanderTarget:null,wanderTimer:0
+  };
+  d.group=dogModel(d.color,d.spot);
+  d.group.position.set(0,.05,14.5);
+  d.group.visible=true;
+  scene.add(d.group);dogs.push(d);
+  showPrompt(d.name+" appeared at the temple!");
+  setTimeout(()=>showPrompt(""),1800);
+}
+// Exactly one new wild dog appears at the temple every minute.
+setInterval(spawnDog,15000);
+
+let rescued=[];
+let coins=0,meals=[];
+let dishesMade=0,dishesSold=0;
+const inventory={ketchup:0,mustard:0,salt:0,pepper:0};
+const prices={ketchup:5,mustard:10,salt:15,pepper:20};
+const ingredientLabels={ketchup:"Ketchup",mustard:"Mustard",salt:"Salt",pepper:"Pepper"};
+let currentMeal={ketchup:0,mustard:0,salt:0,pepper:0};
+let worlds=[];
+let currentWorldId="";
+let currentWorldName="";
+const WORLDS_KEY="runDoggiesRun3DWorlds";
+
+function makeWorldId(){return "world-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7)}
+function dogSaveData(){return dogs.map(d=>({name:d.name,color:d.color,spot:d.spot,x:d.group.position.x,z:d.group.position.z,rescued:!!d.rescued,visible:d.group.visible}))}
+function worldData(){return {id:currentWorldId,name:currentWorldName||"Unnamed World",savedAt:Date.now(),coins,meals:[...meals],dishesMade,dishesSold,inventory:{...inventory},currentMeal:{...currentMeal},skin,player:{x:character.position.x,z:character.position.z,rot:character.rotation.y},dogs:dogSaveData()}}
+function saveWorlds(){try{localStorage.setItem(WORLDS_KEY,JSON.stringify(worlds))}catch(e){showPrompt("Could not save worlds in this browser.");setTimeout(()=>showPrompt(""),1600)}}
+function saveCurrentWorld(){if(!currentWorldId)return;const data=worldData();const i=worlds.findIndex(w=>w.id===currentWorldId);if(i>=0)worlds[i]=data;else worlds.push(data);saveWorlds();renderWorldList()}
+function loadWorlds(){try{const raw=JSON.parse(localStorage.getItem(WORLDS_KEY)||"[]");worlds=Array.isArray(raw)?raw:[]}catch(e){worlds=[]}}
+function formatWorldDate(t){try{return new Date(t).toLocaleString()}catch(e){return ""}}
+function renderWorldList(){
+  const el=document.getElementById("worldList"); if(!el)return;
+  if(!worlds.length){el.innerHTML='<p class="small">No saved worlds yet. Create a world to get started.</p>';return;}
+  el.innerHTML=worlds.map(w=>`<div style="border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:9px;margin:7px 0;background:rgba(0,0,0,.16)">
+    <b>${escapeHtml(w.name||"Unnamed World")}</b>${w.id===currentWorldId?' <span class="small">(current)</span>':''}<br>
+    <span class="small">Saved ${escapeHtml(formatWorldDate(w.savedAt))} · ${w.coins||0} coins · ${(w.meals||[]).length} dishes · ${(w.dogs||[]).filter(d=>d.rescued).length} dogs</span><br>
+    <button data-load-world="${w.id}">Load</button><button data-rename-world="${w.id}">Rename</button><button data-delete-world="${w.id}">Delete</button>
+  </div>`).join("");
+  el.querySelectorAll("[data-load-world]").forEach(b=>b.onclick=()=>loadWorld(b.dataset.loadWorld));
+  el.querySelectorAll("[data-rename-world]").forEach(b=>b.onclick=()=>renameWorld(b.dataset.renameWorld));
+  el.querySelectorAll("[data-delete-world]").forEach(b=>b.onclick=()=>deleteWorld(b.dataset.deleteWorld));
+}
+function escapeHtml(v){return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]))}
+function resetDogsFromData(list){
+  dogs.forEach(d=>scene.remove(d.group));
+  dogs=[];
+  (Array.isArray(list)?list:[]).forEach(d=>{
+    const dog={name:d.name||"Dog",color:Number(d.color)||0xd39b55,spot:d.spot==null?null:Number(d.spot),x:Number(d.x)||0,z:Number(d.z)||0,rescued:!!d.rescued};
+    dog.group=dogModel(dog.color,dog.spot);dog.group.position.set(dog.x,.05,dog.z);dog.group.visible=d.visible!==false;scene.add(dog.group);dogs.push(dog);
+  });
+  rescued=dogs.filter(d=>d.rescued);
+  rescued.forEach(d=>{d.group.visible=true});
+  dogs.forEach(d=>{
+    if(!d.rescued){d.wanderTarget=null;d.wanderTimer=0;}
+  });
+}
+function applyWorld(w){
+  currentWorldId=w.id; currentWorldName=w.name||"Unnamed World";
+  coins=Number(w.coins)||0; meals=Array.isArray(w.meals)?w.meals.map(Number).filter(Number.isFinite):[];
+  dishesMade=Number(w.dishesMade)||0; dishesSold=Number(w.dishesSold)||0;
+  for(const k of Object.keys(inventory))inventory[k]=Number(w.inventory?.[k])||0;
+  currentMeal={ketchup:Number(w.currentMeal?.ketchup)||0,mustard:Number(w.currentMeal?.mustard)||0,salt:Number(w.currentMeal?.salt)||0,pepper:Number(w.currentMeal?.pepper)||0};
+  if(w.skin&&skins[w.skin]){skin=w.skin;buildCharacter()}
+  if(w.username){username=String(w.username).slice(0,20);localStorage.setItem("runDoggiesRunUsername",username)}
+  const usernameEl=document.getElementById("username"); if(usernameEl)usernameEl.value=username;
+  character.position.set(Number(w.player?.x)||0,0,Number(w.player?.z)||0);character.rotation.y=Number(w.player?.rot)||0;
+  resetDogsFromData(w.dogs);
+  updateVillageBoard(); renderWorldList();
+}
+function createFreshWorld(){
+  const name=prompt("Name your new world:","World "+(worlds.length+1));
+  if(name===null)return;
+  saveCurrentWorld();
+  const w={id:makeWorldId(),name:name.trim()||("World "+(worlds.length+1)),savedAt:Date.now(),coins:0,meals:[],dishesMade:0,dishesSold:0,inventory:{ketchup:0,mustard:0,salt:0,pepper:0},currentMeal:{ketchup:0,mustard:0,salt:0,pepper:0},skin:skin,player:{x:0,z:0,rot:0},dogs:[]};
+  // New worlds begin with the four original village dogs.
+  const starter=[];
+  w.dogs=starter; worlds.push(w); saveWorlds(); applyWorld(w); openMenu();
+}
+function loadWorld(id){const w=worlds.find(x=>x.id===id);if(!w)return;saveCurrentWorld();applyWorld(w);showPrompt("Loaded "+w.name);setTimeout(()=>showPrompt(""),1200)}
+function renameWorld(id){const w=worlds.find(x=>x.id===id);if(!w)return;const name=prompt("World name:",w.name);if(name===null)return;w.name=name.trim()||w.name;saveWorlds();renderWorldList()}
+function deleteWorld(id){const w=worlds.find(x=>x.id===id);if(!w)return;if(!confirm("Delete "+(w.name||"this world")+"?"))return;worlds=worlds.filter(x=>x.id!==id);if(currentWorldId===id){currentWorldId="";currentWorldName=""}saveWorlds();renderWorldList()}
+function exportWorlds(){saveCurrentWorld();const blob=new Blob([JSON.stringify({format:"Run Doggies Run 3D Worlds",version:1,worlds},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="run-doggies-run-worlds.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function importWorlds(file){const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);const incoming=Array.isArray(data)?data:data.worlds;if(!Array.isArray(incoming))throw new Error("Invalid world file");const existing=new Set(worlds.map(w=>w.id));for(const w of incoming){const copy=JSON.parse(JSON.stringify(w));if(!copy.id||existing.has(copy.id))copy.id=makeWorldId();copy.name=copy.name||"Imported World";worlds.push(copy)}saveWorlds();renderWorldList();showPrompt("Imported "+incoming.length+" world"+(incoming.length===1?"":"s")+"!");setTimeout(()=>showPrompt(""),1500)}catch(e){showPrompt("That world file could not be imported.");setTimeout(()=>showPrompt(""),1600)}};r.readAsText(file)}
+
+loadWorlds();
+
+// Village board: dogs, dog dishes, and coins.
+let boardCanvas,boardCtx,boardTexture,boardSprite;
+function createVillageBoard(){
+  boardCanvas=document.createElement("canvas"); boardCanvas.width=900; boardCanvas.height=430;
+  boardCtx=boardCanvas.getContext("2d"); boardTexture=new THREE.CanvasTexture(boardCanvas);
+  const board=new THREE.Mesh(new THREE.BoxGeometry(5.8,3,.18),mat(0x6b4328));
+  board.position.set(0,5.2,0); scene.add(board);
+  boardSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:boardTexture,transparent:true,depthTest:false}));
+  boardSprite.position.set(0,5.2,0); boardSprite.scale.set(5.5,2.65,1); scene.add(boardSprite);
+  updateVillageBoard();
+}
+function updateVillageBoard(){
+  if(!boardCtx)return;
+  const c=boardCtx; c.clearRect(0,0,900,430);
+  c.fillStyle="#e6c88a"; c.fillRect(0,0,900,430);
+  c.strokeStyle="#4a2d1b"; c.lineWidth=18; c.strokeRect(9,9,882,412);
+  c.fillStyle="#3b2418"; c.font="bold 52px Arial"; c.textAlign="center";
+  c.fillText("DOG VILLAGE BOARD",450,62);
+  c.font="bold 30px Arial"; c.textAlign="left";
+  c.fillText("DOGS",55,125); c.fillText("DOG DISHES",315,125); c.fillText("COINS",665,125);
+  c.font="bold 58px Arial"; c.textAlign="center";
+  c.fillText(String(rescued.length),135,205); c.fillText(String(meals.length),450,205); c.fillText(String(coins),770,205);
+  c.font="24px Arial";
+  c.fillText(rescued.length?"Dogs ready to help!":"Rescue a dog first!",135,255);
+  c.fillText("Dog dishes made",450,255); c.fillText("Coins available",770,255);
+  c.font="bold 26px Arial"; c.fillStyle="#7a3e20";
+  c.fillText("KITCHEN: DOG DISHES REQUIRE A DOG",450,330);
+  c.font="22px Arial"; c.fillStyle="#3b2418";
+  c.fillText("Bring a rescued dog to the kitchen, then press E.",450,370);
+  boardTexture.needsUpdate=true;
+}
+createVillageBoard();
+// Load the last played world, or create the first default world.
+if(worlds.length){applyWorld(worlds[0]);}
+else{
+  currentWorldId=makeWorldId(); currentWorldName="World 1";
+  saveCurrentWorld();
+}
+let yaw=0,pitch=.12;
+let keys={};
+let pointerLocked=false;
+const promptEl=document.getElementById("prompt");
+
+function nearestWildDog(){
+  let best=null,bd=2.8;
+  for(const d of dogs){
+    if(d.rescued)continue;
+    const dist=character.position.distanceTo(d.group.position);
+    if(dist<bd){bd=dist;best=d}
+  }
+  return best;
+}
+function showPrompt(t){promptEl.textContent=t;promptEl.style.display=t?"block":"none"}
+
+function collectDog(){
+  const d=nearestWildDog();
+  if(!d)return false;
+  d.rescued=true;rescued.push(d);updateVillageBoard(); sendPlayerState(true);
+  const name=prompt("Give your dog a name:",d.name);
+  if(name)d.name=name;
+  // Return to mouse-look immediately after the name dialog closes.
+  setTimeout(()=>renderer.domElement.requestPointerLock?.(),0);
+  showPrompt(d.name+" joined you!");
+  setTimeout(()=>showPrompt(""),1200);
+  return true;
+}
+
+function ingredientBonus(meal){
+  return Object.entries(meal).reduce((sum,[item,count])=>sum+prices[item]*count,0);
+}
+function renderShop(){
+  const el=document.getElementById("shopItems"); el.innerHTML="";
+  for(const item of Object.keys(prices)){
+    const row=document.createElement("div"); row.className="row";
+    row.innerHTML=`<span>${ingredientLabels[item]} — ${prices[item]} coins (owned: ${inventory[item]})</span>`;
+    const b=document.createElement("button"); b.textContent="Buy"; b.onclick=()=>{
+      if(coins<prices[item]){showPrompt("Not enough coins.");setTimeout(()=>showPrompt(""),1000);return;}
+      coins-=prices[item]; inventory[item]++; updateVillageBoard(); renderShop(); sendPlayerState(true);
+    }; row.appendChild(b); el.appendChild(row);
+  }
+}
+function openShop(){ renderShop(); document.getElementById("shopMenu").classList.remove("hidden"); document.exitPointerLock?.(); }
+function renderKitchen(){
+  const el=document.getElementById("kitchenItems"); el.innerHTML="";
+  for(const item of Object.keys(prices)){
+    const row=document.createElement("div"); row.className="row";
+    row.innerHTML=`<span>${ingredientLabels[item]} — owned: ${inventory[item]}, in meal: ${currentMeal[item]}</span>`;
+    const b=document.createElement("button"); b.textContent="Add"; b.disabled=inventory[item]<=0; b.onclick=()=>{inventory[item]--;currentMeal[item]++;renderKitchen();};
+    row.appendChild(b); el.appendChild(row);
+  }
+  const bonus=ingredientBonus(currentMeal);
+  document.getElementById("mealInfo").textContent=`Current dog dish: 15 base coins + ${bonus} ingredient bonus = ${15+bonus} coins`;
+}
+function openKitchen(){
+  if(rescued.length===0){showPrompt("Rescue a dog first! A dog is needed to make dog dishes.");setTimeout(()=>showPrompt(""),1600);return;}
+  renderKitchen(); document.getElementById("kitchenMenu").classList.remove("hidden"); document.exitPointerLock?.();
+}
+function closeShop(){
+  document.getElementById("shopMenu").classList.add("hidden");
+  setTimeout(()=>renderer.domElement.requestPointerLock?.(),0);
+}
+function closeKitchen(){
+  document.getElementById("kitchenMenu").classList.add("hidden");
+  setTimeout(()=>renderer.domElement.requestPointerLock?.(),0);
+}
+document.getElementById("shopClose").onclick=closeShop;
+document.getElementById("kitchenClose").onclick=closeKitchen;
+document.getElementById("makeDish").onclick=()=>{
+  if(rescued.length===0){
+    showPrompt("You need a dog to make a dog dish!");
+    setTimeout(()=>showPrompt(""),1200);
+    return;
+  }
+  const usedDog=rescued.shift();
+  usedDog.rescued=false;
+  scene.remove(usedDog.group);
+  dogs=dogs.filter(d=>d!==usedDog);
+  meals.push(15+ingredientBonus(currentMeal));
+  dishesMade++;
+  currentMeal={ketchup:0,mustard:0,salt:0,pepper:0};
+  updateVillageBoard();
+  renderKitchen();
+  sendPlayerState(true);
+  showPrompt("Dog dish made! You used one dog.");
+  setTimeout(()=>showPrompt(""),1200);
+};
+
+function interact(){
+  if(collectDog())return;
+  const kitchen=new THREE.Vector3(-18,0,-12);
+  const market=new THREE.Vector3(18,0,-12);
+  const temple=new THREE.Vector3(0,0,20);
+  const shop=new THREE.Vector3(25,0,18);
+  if(character.position.distanceTo(shop)<7){openShop();return;}
+  if(character.position.distanceTo(kitchen)<7){openKitchen();return;}
+  if(character.position.distanceTo(market)<7&&meals.length>0){
+    const value=meals.shift(); coins+=value; dishesSold++; updateVillageBoard(); sendPlayerState(true);
+    showPrompt("Sold a dog dish for "+value+" coins!");
+    setTimeout(()=>showPrompt(""),1200); return;
+  }
+  if(character.position.distanceTo(temple)<7){
+    showPrompt("The village temple is peaceful.");setTimeout(()=>showPrompt(""),1200);
+  }
+}
+
+function openMenu(){
+  document.exitPointerLock?.();
+  document.getElementById("menu").classList.remove("hidden");
+}
+function lock(){
+  document.getElementById("menu").classList.add("hidden");
+  renderer.domElement.requestPointerLock?.();
+}
+document.getElementById("menuBtn").onclick=openMenu;
+document.getElementById("resume").onclick=lock;
+const usernameInput=document.getElementById("username"); usernameInput.value=username; usernameInput.addEventListener("input",()=>{username=usernameInput.value.trim().slice(0,20)||"Player";localStorage.setItem("runDoggiesRunUsername",username);sendPlayerState(true)});
+document.getElementById("skinsOpen").onclick=()=>document.getElementById("skinsPanel").classList.toggle("hidden");
+document.getElementById("worldOpen").onclick=()=>document.getElementById("worldPanel").classList.toggle("hidden");
+document.getElementById("multiOpen").onclick=()=>document.getElementById("multiPanel").classList.toggle("hidden");
+document.getElementById("newWorld").onclick=createFreshWorld;
+document.getElementById("exportWorld").onclick=exportWorlds;
+document.getElementById("importWorld").onclick=()=>document.getElementById("worldFile").click();
+document.getElementById("worldFile").addEventListener("change",e=>{if(e.target.files[0])importWorlds(e.target.files[0]);e.target.value=""});
+renderWorldList();
+setInterval(saveCurrentWorld,5000);
+document.querySelectorAll(".panel .back").forEach(b=>b.onclick=openMenu);
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.preventDefault();openMenu();return}
+  if(["INPUT","TEXTAREA"].includes(document.activeElement.tagName))return;
+  keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==="e"){if(!tryStealFromNearbyPlayer())interact();}
+  if(e.code==="Space"){e.preventDefault();jump();}
+});
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+renderer.domElement.addEventListener("click",()=>{
+  if(document.getElementById("menu").classList.contains("hidden"))renderer.domElement.requestPointerLock?.();
+});
+document.addEventListener("pointerlockchange",()=>{pointerLocked=document.pointerLockElement===renderer.domElement});
+
+renderer.domElement.addEventListener("mousemove",e=>{
+  if(!pointerLocked)return;
+  yaw-=e.movementX*.0025;
+  pitch-=e.movementY*.002;
+  pitch=Math.max(-.35,Math.min(.65,pitch));
+});
+
+let verticalVelocity=0,grounded=true;
+const PLAYER_RADIUS=.48;
+function tryMove(nx,nz){
+  // IMPORTANT: buildings have no invisible wall collider. Only their four corner posts block movement.
+  for(const b of buildingColliders){
+    const inside=nx>b.x-b.w/2-PLAYER_RADIUS&&nx<b.x+b.w/2+PLAYER_RADIUS&&nz>b.z-b.d/2-PLAYER_RADIUS&&nz<b.z+b.d/2+PLAYER_RADIUS;
+    if(inside&&character.position.y<b.top-0.15)return false;
+  }
+  // No other building-volume collision is checked here: the open interior is passable.
+  // Furniture remains solid while the player is on the ground/inside its height.
+  for(const f of furnitureColliders){
+    const inside=nx>f.x-f.w/2-PLAYER_RADIUS&&nx<f.x+f.w/2+PLAYER_RADIUS&&nz>f.z-f.d/2-PLAYER_RADIUS&&nz<f.z+f.d/2+PLAYER_RADIUS;
+    if(inside&&character.position.y<f.top-0.15)return false;
+  }
+  for(const t of treeColliders){
+    if(Math.hypot(nx-t.x,nz-t.z)<t.r+PLAYER_RADIUS&&character.position.y<t.top-0.15)return false;
+  }
+  // Roof ridges/poles are solid when reached; the main roof is a solid walkable floor.
+  for(const r of roofPoleColliders){
+    const inside=nx>r.x-r.w/2-PLAYER_RADIUS&&nx<r.x+r.w/2+PLAYER_RADIUS&&nz>r.z-r.d/2-PLAYER_RADIUS&&nz<r.z+r.d/2+PLAYER_RADIUS;
+    if(inside&&character.position.y>4.75&&character.position.y<r.top-0.1)return false;
+  }
+  character.position.x=nx;character.position.z=nz;return true;
+}
+function jump(){if(grounded){verticalVelocity=.36;grounded=false}}
+function updateVertical(){
+  // Remember where the player was before gravity moves them. A roof/furniture/tree
+  // can only catch the player if they were already above that surface. This prevents
+  // walking through an open building from ever snapping up onto its roof.
+  const previousY=character.position.y;
+  verticalVelocity-=.012;
+  character.position.y+=verticalVelocity;
+  let floor=0;
+  if(verticalVelocity<=0){
+    for(const r of roofSurfaces){
+      const overRoof=Math.abs(character.position.x-r.x)<r.w/2&&Math.abs(character.position.z-r.z)<r.d/2;
+      if(overRoof && previousY>=r.top && character.position.y<=r.top)floor=Math.max(floor,r.top);
+    }
+    for(const f of furnitureColliders){
+      const overFurniture=Math.abs(character.position.x-f.x)<f.w/2&&Math.abs(character.position.z-f.z)<f.d/2;
+      if(overFurniture && previousY>=f.top && character.position.y<=f.top)floor=Math.max(floor,f.top);
+    }
+    for(const t of treeColliders){
+      const overTree=Math.hypot(character.position.x-t.x,character.position.z-t.z)<t.r;
+      if(overTree && previousY>=t.top && character.position.y<=t.top)floor=Math.max(floor,t.top);
+    }
+  }
+  if(character.position.y<=floor){character.position.y=floor;verticalVelocity=0;grounded=true;}
+  else if(floor===0 && character.position.y>0){grounded=false;}
+}
+function updateMovement(){
+  let f=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
+  let st=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+  const len=Math.hypot(f,st)||1;f/=len;st/=len;
+  if(f||st){
+    const fx=-Math.sin(yaw),fz=-Math.cos(yaw); const rx=Math.cos(yaw),rz=-Math.sin(yaw);
+    const mx=fx*f+rx*st,mz=fz*f+rz*st;
+    const nx=Math.max(-65,Math.min(65,character.position.x+mx*.16));
+    const nz=Math.max(-55,Math.min(55,character.position.z+mz*.16));
+    if(tryMove(nx,nz))character.rotation.y=Math.atan2(mx,mz);
+  }
+  updateVertical();
+}
+function updateDogs(){
+  const now=performance.now();
+  dogs.forEach(d=>{
+    if(!d.group.visible||d.rescued)return;
+    if(!d.wanderTarget||now>d.wanderTimer){
+      // Wild dogs wander around the temple area, staying clear of the other buildings.
+      d.wanderTarget=new THREE.Vector3((Math.random()-.5)*18,.05,20+(Math.random()-.5)*14);
+      d.wanderTarget.x=Math.max(-10,Math.min(10,d.wanderTarget.x));
+      d.wanderTarget.z=Math.max(13,Math.min(27,d.wanderTarget.z));
+      d.wanderTimer=now+1800+Math.random()*2600;
+    }
+    const dx=d.wanderTarget.x-d.group.position.x,dz=d.wanderTarget.z-d.group.position.z;
+    const dist=Math.hypot(dx,dz);
+    if(dist>.15){
+      const speed=.012;
+      d.group.position.x+=dx/dist*speed;
+      d.group.position.z+=dz/dist*speed;
+      d.group.rotation.y=Math.atan2(dx,dz);
+    }
+  });
+  rescued.forEach((d,i)=>{
+    const angle=.7+i*.65;
+    const target=character.position.clone().add(new THREE.Vector3(Math.sin(angle)*.9,.15,Math.cos(angle)*.9));
+    d.group.position.lerp(target,.12);
+    d.group.rotation.y=character.rotation.y;
+    d.group.scale.set(.72,.72,.72);
+  });
+}
+function updateCamera(){
+  const dist=7;
+  const target=character.position.clone();target.y+=1.6;
+  camera.position.set(
+    character.position.x+Math.sin(yaw)*dist*Math.cos(pitch),
+    3.8+Math.sin(pitch)*dist,
+    character.position.z+Math.cos(yaw)*dist*Math.cos(pitch)
+  );
+  camera.lookAt(target);
+}
+function updateRemotePlayers(){
+  remotePlayers.forEach(r=>{
+    if(r.target){r.position.lerp(r.target,.35);r.rotation.y += (r.targetRot-r.rotation.y)*.35;}
+  });
+}
+function animate(){
+  requestAnimationFrame(animate);
+  updateMovement();updateDogs();updateRemotePlayers();updateCamera();
+  const d=nearestWildDog();
+  if(d)showPrompt("Press E to collect "+d.name);
+  else if(promptEl.textContent.startsWith("Press E"))showPrompt("");
+  sendPlayerState();
+  renderer.render(scene,camera);
+}
+window.addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+
+/* Multiplayer */
+let peer=null,myPeerId="",connections=[],remotePlayers=new Map(),isHost=false;
+let lastNetSend=0;
+const playerNames=new Map();
+function localStats(){return {dogs:rescued.length,dishes:meals.length,coins,dishesMade,dishesSold,inventory:{...inventory}}}
+function code(){const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<6;i++)s+=c[Math.floor(Math.random()*c.length)];return s}
+function net(t){document.getElementById("net").textContent=t}
+function count(){}
+function remoteChar(skinName="Traveler"){
+  const g=new THREE.Group();
+  buildCharacterInto(g,skinName);
+  scene.add(g);return g;
+}
+function removeConnection(c){connections=connections.filter(x=>x!==c)}
+function clearRemote(){remotePlayers.forEach(r=>scene.remove(r));remotePlayers.clear();count()}
+function closeMultiplayer(){
+  connections.forEach(c=>{try{c.close()}catch(e){}});connections=[];clearRemote();
+  if(peer){try{peer.destroy()}catch(e){}}
+  peer=null;myPeerId="";isHost=false;
+}
+function broadcast(m,except=null){
+  connections=connections.filter(c=>c&&c.open);
+  connections.forEach(c=>{if(c===except)return;try{c.send(m)}catch(e){}});
+}
+function makeState(){return {type:"state",id:myPeerId,name:username,x:character.position.x,y:character.position.y,z:character.position.z,rot:character.rotation.y,skin,stats:localStats()}}
+function applyRemoteState(m){
+  if(!m||!m.id||m.id===myPeerId)return;
+  let r=remotePlayers.get(m.id);
+  if(!r){r=remoteChar(m.skin||"Traveler");r.skin=m.skin||"Traveler";r.userName=m.name||m.id.slice(0,8);r.target=new THREE.Vector3();r.targetRot=0;remotePlayers.set(m.id,r)}
+  r.target.set(Number(m.x)||0,Number(m.y)||0,Number(m.z)||0); r.targetRot=Number(m.rot)||0;
+  if(m.skin&&m.skin!==r.skin){r.skin=m.skin;buildCharacterInto(r,m.skin);}
+  r.userName=m.name||r.userName; r.stats=m.stats||r.stats; count();
+}
+function tryStealFromNearbyPlayer(){
+  let nearest=null,best=2.6;
+  remotePlayers.forEach((r,id)=>{const d=character.position.distanceTo(r.position);if(d<best){best=d;nearest=id}});
+  if(nearest){broadcast({type:"stealRequest",to:nearest,from:myPeerId,name:username});showPrompt("You tried to steal a dog!");setTimeout(()=>showPrompt(""),900);return true;}
+  return false;
+}
+
+function setupConn(c){
+  if(!c||connections.includes(c))return;connections.push(c);
+  c.on("open",()=>{
+    if(isHost){
+      net("World connected. Players can now see each other.");
+      remotePlayers.forEach((r,id)=>{try{c.send({type:"state",id,x:r.position.x,z:r.position.z,rot:r.rotation.y,skin:r.skin,name:r.userName,stats:r.stats})}catch(e){}});
+    }else net("Connected to the host.");
+    sendPlayerState(true);
+  });
+  c.on("data",m=>{
+    if(!m||m.id===myPeerId)return;
+    if(m.type==="state"){applyRemoteState(m);if(isHost)broadcast(m,c)}
+    if(m.type==="stealRequest"){
+      if(m.to===myPeerId && rescued.length){
+        const d=rescued.shift(); d.rescued=false; scene.remove(d.group); dogs=dogs.filter(x=>x!==d);
+        const transfer={type:"dogTransfer",to:m.from,name:d.name,color:d.color,spot:d.spot};
+        const target=connections.find(x=>x.peer===m.from);
+        if(target&&target.open)target.send(transfer); else if(!isHost){const host=connections[0];if(host&&host.open)host.send(transfer);}
+        const notice={type:"stealNotice",to:m.to,name:m.name||"Another player"};
+        if(isHost)broadcast(notice,c); else {const host=connections[0];if(host&&host.open)host.send(notice);}
+        updateVillageBoard();sendPlayerState(true);
+      }
+      if(isHost&&m.to!==myPeerId)broadcast(m,c);
+    }
+    if(m.type==="dogTransfer"&&m.to===myPeerId){
+      const d={name:m.name||"Stolen Dog",color:Number(m.color)||0xd39b55,spot:m.spot==null?null:Number(m.spot),rescued:true,wanderTarget:null,wanderTimer:0};
+      d.group=dogModel(d.color,d.spot);d.group.position.copy(character.position);scene.add(d.group);dogs.push(d);rescued.push(d);updateVillageBoard();sendPlayerState(true);
+      showPrompt(d.name+" was stolen into your village!");setTimeout(()=>showPrompt(""),1200);
+    }
+    if(m.type==="stealNotice"&&m.to===myPeerId){showPrompt((m.name||"A player")+" stole one of your dogs!");setTimeout(()=>showPrompt(""),1200)}
+    if(isHost&&m.type==="dogTransfer")broadcast(m,c);
+    if(isHost&&m.type==="stealNotice")broadcast(m,c);
+  });
+  c.on("close",()=>{
+    removeConnection(c);
+    if(remotePlayers.has(c.peer)){scene.remove(remotePlayers.get(c.peer));remotePlayers.delete(c.peer);count()}
+    if(connections.length===0&&peer&&!peer.destroyed)net(isHost?"World ready. Waiting for another player.":"Disconnected from host.");
+  });
+  c.on("error",()=>removeConnection(c));
+}
+function sendPlayerState(force=false){
+  if(!myPeerId)return;
+  const now=performance.now();if(!force&&now-lastNetSend<50)return;lastNetSend=now;
+  broadcast(makeState());
+}
+function createPeerAsHost(id){
+  isHost=true;peer=new Peer(id);
+  peer.on("open",openedId=>{
+    myPeerId=openedId;document.getElementById("worldCode").textContent=openedId.toUpperCase();document.getElementById("joinCode").value=openedId.toUpperCase();net("World ready! Share code "+openedId.toUpperCase());count();
+  });
+  peer.on("connection",setupConn);
+  peer.on("error",e=>{
+    if(e.type==="unavailable-id"){
+      try{peer.destroy()}catch(err){}
+      const next=code();document.getElementById("worldCode").textContent=next;document.getElementById("joinCode").value=next;net("That world code was already in use. Creating a new one...");setTimeout(()=>createPeerAsHost(next),300);return;
+    }
+    net("Host error: "+(e.type||"network error"));
+  });
+  peer.on("disconnected",()=>{if(peer&&!peer.destroyed)peer.reconnect()});
+}
+function createSession(){
+  closeMultiplayer();const c=code();document.getElementById("worldCode").textContent=c;document.getElementById("joinCode").value=c;
+  if(typeof Peer==="undefined"){net("Multiplayer library failed to load. Check your internet connection.");return}
+  net("Creating world...");createPeerAsHost(c);
+}
+function joinSession(){
+  const c=document.getElementById("joinCode").value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(c.length!==6){net("Enter exactly 6 characters.");return}
+  closeMultiplayer();if(typeof Peer==="undefined"){net("Multiplayer library failed to load. Check your internet connection.");return}
+  isHost=false;net("Joining "+c+"...");peer=new Peer();
+  peer.on("open",id=>{
+    myPeerId=id;const con=peer.connect(c,{reliable:true});setupConn(con);
+    setTimeout(()=>{if(!con.open)net("Could not connect. Check the code and make sure the host is still online.")},10000);
+  });
+  peer.on("error",e=>net("Could not join: "+(e.type||"network error")));
+  peer.on("disconnected",()=>{if(peer&&!peer.destroyed)peer.reconnect()});
+}
+document.getElementById("createSession").onclick=createSession;
+document.getElementById("joinSession").onclick=joinSession;
+document.getElementById("copyCode").onclick=async()=>{
+  const c=document.getElementById("worldCode").textContent;if(c==="------")return;
+  try{await navigator.clipboard.writeText(c);net("Copied code "+c)}catch(e){net("Code: "+c)}
+};
+
+window.addEventListener("beforeunload",saveCurrentWorld);
+animate();
+</script>
+</body>
+</html>
